@@ -1,0 +1,224 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>ZXing Barcode Tester</title>
+<style>
+  * { box-sizing: border-box; margin: 0; padding: 0; }
+  body { font-family: Segoe UI, sans-serif; background: #f3f4f6; display: flex; flex-direction: column; align-items: center; padding: 24px 16px; }
+  h1 { font-size: 20px; font-weight: 600; color: #1e293b; margin-bottom: 4px; }
+  .sub { font-size: 13px; color: #64748b; margin-bottom: 16px; }
+  .card { background: #fff; border-radius: 12px; border: 1px solid #e2e8f0; padding: 20px; width: 100%; max-width: 500px; margin-bottom: 14px; }
+  .card h2 { font-size: 14px; font-weight: 600; color: #334155; margin-bottom: 12px; }
+  video { width: 100%; border-radius: 8px; display: block; background: #000; max-height: 240px; object-fit: contain; }
+  #preview-img { width: 100%; border-radius: 8px; display: none; border: 1px solid #e2e8f0; background: #f8fafc; max-height: 240px; object-fit: contain; margin-bottom: 4px; }
+  .result { margin-top: 10px; padding: 12px; border-radius: 8px; font-size: 14px; line-height: 1.6;
+            background: #f8fafc; border: 1px solid #e2e8f0; color: #64748b; word-break: break-all; }
+  .result.ok  { background: #f0fdf4; border-color: #86efac; color: #166534; }
+  .result.err { background: #fef2f2; border-color: #fca5a5; color: #991b1b; }
+  .btn-row { display: flex; gap: 8px; margin-top: 12px; flex-wrap: wrap; }
+  button { padding: 9px 18px; border-radius: 8px; border: none; font-size: 13px; font-weight: 500; cursor: pointer; }
+  .b-blue { background: #2563eb; color: #fff; } .b-blue:hover { background: #1d4ed8; }
+  .b-red  { background: #ef4444; color: #fff; } .b-red:hover  { background: #dc2626; }
+  .b-gray { background: #e2e8f0; color: #334155; } .b-gray:hover { background: #cbd5e1; }
+  .tip { font-size: 12px; color: #94a3b8; margin-top: 8px; }
+  #status { font-size: 13px; padding: 8px 14px; border-radius: 8px; margin-bottom: 14px;
+            width: 100%; max-width: 500px; border: 1px solid; }
+  .s-wait { background: #fffbeb; border-color: #fcd34d; color: #92400e; }
+  .s-ok   { background: #f0fdf4; border-color: #86efac; color: #166534; }
+  .s-err  { background: #fef2f2; border-color: #fca5a5; color: #991b1b; }
+  #frames { font-size: 12px; color: #94a3b8; margin-top: 6px; }
+  .fmt-list { display: flex; flex-wrap: wrap; gap: 4px; margin-top: 8px; }
+  .fmt { background: #eff6ff; color: #1d4ed8; font-size: 11px; padding: 2px 8px; border-radius: 4px; }
+</style>
+</head>
+<body>
+
+<h1>ZXing Barcode Tester</h1>
+<p class="sub">Test if ZXing.js reads your laser-printed barcodes</p>
+<div id="status" class="s-wait">⏳ Loading ZXing library…</div>
+
+<!-- CAMERA -->
+<div class="card">
+  <h2>📷 Live Camera</h2>
+  <video id="video" playsinline muted></video>
+  <div class="result" id="cam-result">Press Start Camera, then aim at your barcode.</div>
+  <div id="frames"></div>
+  <div class="btn-row">
+    <button class="b-blue" onclick="startCamera()">▶ Start Camera</button>
+    <button class="b-red"  onclick="stopCamera()">■ Stop</button>
+  </div>
+  <p class="tip">Continuous scan — no tap needed once running.</p>
+</div>
+
+<!-- IMAGE UPLOAD -->
+<div class="card">
+  <h2>🖼️ Upload Barcode Image</h2>
+  <img id="preview-img" alt="Barcode preview">
+  <div class="btn-row">
+    <button class="b-gray" onclick="document.getElementById('file-in').click()">📁 Choose Image</button>
+    <input id="file-in" type="file" accept="image/*" style="display:none" onchange="onFileChosen(event)">
+  </div>
+  <div class="result" id="img-result">Choose an image file to scan.</div>
+  <p class="tip">Tip: use a cropped, well-lit photo of the barcode.</p>
+</div>
+
+<!-- FORMATS -->
+<div class="card">
+  <h2>✅ Supported Formats</h2>
+  <div class="fmt-list">
+    <span class="fmt">QR Code</span><span class="fmt">Code 128</span><span class="fmt">Code 39</span>
+    <span class="fmt">EAN-13</span><span class="fmt">EAN-8</span><span class="fmt">UPC-A</span>
+    <span class="fmt">UPC-E</span><span class="fmt">ITF</span><span class="fmt">PDF417</span>
+    <span class="fmt">Aztec</span><span class="fmt">Data Matrix</span><span class="fmt">Codabar</span>
+  </div>
+</div>
+
+<script>
+/* ── Load ZXing ── */
+var zxingReady = false;
+
+function loadScript(src, ok, fail) {
+  var s = document.createElement('script');
+  s.src = src; s.onload = ok; s.onerror = fail;
+  document.head.appendChild(s);
+}
+
+function onZXingLoaded() {
+  if (typeof ZXing === 'undefined' || !ZXing.BrowserMultiFormatReader) {
+    setStatus('err', '❌ Script loaded but ZXing global not found. Try refreshing.');
+    return;
+  }
+  zxingReady = true;
+  setStatus('ok', '✅ ZXing ready — camera and image upload enabled.');
+}
+
+loadScript(
+  'https://cdn.jsdelivr.net/npm/@zxing/library@0.19.1/umd/index.min.js',
+  onZXingLoaded,
+  function () {
+    loadScript(
+      'https://unpkg.com/@zxing/library@0.19.1/umd/index.min.js',
+      onZXingLoaded,
+      function () { setStatus('err', '❌ Both CDNs failed. Check internet and refresh.'); }
+    );
+  }
+);
+
+function setStatus(type, msg) {
+  var el = document.getElementById('status');
+  el.className = 's-' + type;
+  el.textContent = msg;
+}
+
+function guard() {
+  if (!zxingReady) { alert('ZXing not loaded yet — wait for the green banner.'); return false; }
+  return true;
+}
+
+function escHtml(s) {
+  return String(s).replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;');
+}
+
+/* ── Camera ── */
+var cameraReader = null;
+var frameCount = 0;
+
+function startCamera() {
+  if (!guard() || cameraReader) return;
+  var resultEl = document.getElementById('cam-result');
+  resultEl.className = 'result';
+  resultEl.textContent = '🔍 Scanning… aim at your barcode.';
+  frameCount = 0;
+
+  cameraReader = new ZXing.BrowserMultiFormatReader();
+  cameraReader.decodeFromVideoDevice(null, document.getElementById('video'), function (result, err) {
+    frameCount++;
+    document.getElementById('frames').textContent = 'Frames: ' + frameCount;
+    if (result) {
+      resultEl.className = 'result ok';
+      resultEl.innerHTML =
+        '✅ <strong>READABLE</strong><br>' +
+        '<strong>Value:</strong> '  + escHtml(result.getText()) + '<br>' +
+        '<strong>Format:</strong> ' + escHtml(result.getBarcodeFormat());
+    } else if (err && !(err instanceof ZXing.NotFoundException)) {
+      resultEl.className = 'result err';
+      resultEl.textContent = '❌ ' + err.message;
+    }
+  });
+}
+
+function stopCamera() {
+  if (cameraReader) { cameraReader.reset(); cameraReader = null; }
+  document.getElementById('frames').textContent = '';
+  var r = document.getElementById('cam-result');
+  r.className = 'result';
+  r.textContent = 'Camera stopped.';
+}
+
+/* ── Image Upload ──
+   FIX: Use FileReader → data: URL instead of URL.createObjectURL()
+   createObjectURL() produces blob:// URLs which Chrome blocks when
+   the page is opened from file:// (treated as cross-origin).
+   data: URLs have no such restriction.
+*/
+function onFileChosen(evt) {
+  if (!guard()) return;
+  var file = evt.target.files[0];
+  if (!file) return;
+
+  var resultEl  = document.getElementById('img-result');
+  var previewEl = document.getElementById('preview-img');
+
+  resultEl.className = 'result';
+  resultEl.textContent = '🔍 Reading file…';
+  previewEl.style.display = 'none';
+
+  /* Step 1 — read file as base64 data URL (works on file://) */
+  var fr = new FileReader();
+  fr.onerror = function () {
+    resultEl.className = 'result err';
+    resultEl.textContent = '❌ Could not read the file.';
+  };
+  fr.onload = function (e) {
+    var dataUrl = e.target.result;       // "data:image/png;base64,…"
+
+    /* Step 2 — show preview */
+    previewEl.src = dataUrl;
+    previewEl.style.display = 'block';
+
+    /* Step 3 — wait for image to render, then decode */
+    previewEl.onload = function () {
+      resultEl.textContent = '🔍 Scanning barcode…';
+      var reader = new ZXing.BrowserMultiFormatReader();
+
+      /* decodeFromImageElement reads from the rendered <img> element */
+      reader.decodeFromImageElement(previewEl)
+        .then(function (result) {
+          resultEl.className = 'result ok';
+          resultEl.innerHTML =
+            '✅ <strong>READABLE</strong><br>' +
+            '<strong>Value:</strong> '  + escHtml(result.getText()) + '<br>' +
+            '<strong>Format:</strong> ' + escHtml(result.getBarcodeFormat());
+        })
+        .catch(function () {
+          resultEl.className = 'result err';
+          resultEl.innerHTML =
+            '❌ <strong>Not readable</strong> — ZXing could not find a barcode.<br>' +
+            '<span style="font-size:12px">Try: crop closer · better lighting · avoid glare · higher resolution</span>';
+        });
+    };
+
+    previewEl.onerror = function () {
+      resultEl.className = 'result err';
+      resultEl.textContent = '❌ Could not display the image. Is it a valid image file?';
+    };
+  };
+
+  fr.readAsDataURL(file);   /* ← key fix: no blob://, no file:// cross-origin issue */
+}
+</script>
+
+</body>
+</html>
