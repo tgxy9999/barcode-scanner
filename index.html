@@ -6,61 +6,137 @@
 <title>Barcode Scanner</title>
 <style>
   * { box-sizing: border-box; margin: 0; padding: 0; }
-  body { font-family: Segoe UI, sans-serif; background: #f3f4f6; display: flex; flex-direction: column; align-items: center; padding: 24px 16px; }
+  body { font-family: Segoe UI, sans-serif; background: #f3f4f6; display: flex; flex-direction: column; align-items: center; padding: 20px 16px; }
   h1 { font-size: 20px; font-weight: 600; color: #1e293b; margin-bottom: 4px; }
-  .sub { font-size: 13px; color: #64748b; margin-bottom: 16px; }
-  #lib-status { font-size: 13px; padding: 8px 14px; border-radius: 8px; margin-bottom: 14px; width: 100%; max-width: 500px; border: 1px solid; }
-  .s-wait { background: #fffbeb; border-color: #fcd34d; color: #92400e; }
-  .s-ok   { background: #f0fdf4; border-color: #86efac; color: #166534; }
-  .s-err  { background: #fef2f2; border-color: #fca5a5; color: #991b1b; }
-  .card { background: #fff; border-radius: 12px; border: 1px solid #e2e8f0; padding: 20px; width: 100%; max-width: 500px; margin-bottom: 14px; }
-  .card h2 { font-size: 14px; font-weight: 600; color: #334155; margin-bottom: 12px; }
-  video { width: 100%; border-radius: 8px; display: block; background: #000; max-height: 280px; object-fit: cover; }
-  .result { margin-top: 12px; padding: 12px; border-radius: 8px; font-size: 14px; line-height: 1.7;
+  .sub { font-size: 13px; color: #64748b; margin-bottom: 14px; text-align: center; }
+  .banner { font-size: 13px; padding: 8px 14px; border-radius: 8px; margin-bottom: 12px; width: 100%; max-width: 500px; border: 1px solid; }
+  .b-wait { background: #fffbeb; border-color: #fcd34d; color: #92400e; }
+  .b-ok   { background: #f0fdf4; border-color: #86efac; color: #166534; }
+  .b-err  { background: #fef2f2; border-color: #fca5a5; color: #991b1b; }
+  .b-info { background: #eff6ff; border-color: #93c5fd; color: #1e40af; }
+  .card { background: #fff; border-radius: 12px; border: 1px solid #e2e8f0; padding: 18px; width: 100%; max-width: 500px; margin-bottom: 12px; }
+  video { width: 100%; border-radius: 8px; display: block; background: #000; max-height: 300px; object-fit: cover; }
+  /* Overlay aim box on video */
+  .video-wrap { position: relative; }
+  .aim-box { position: absolute; top: 50%; left: 50%; transform: translate(-50%, -50%);
+             width: 70%; height: 40%; border: 2px solid rgba(255,255,255,0.7);
+             border-radius: 8px; pointer-events: none; box-shadow: 0 0 0 9999px rgba(0,0,0,0.3); }
+  .aim-label { position: absolute; bottom: 8px; left: 50%; transform: translateX(-50%);
+               font-size: 11px; color: rgba(255,255,255,0.8); white-space: nowrap; }
+  .result { margin-top: 12px; padding: 14px; border-radius: 8px; font-size: 14px; line-height: 1.8;
             background: #f8fafc; border: 1px solid #e2e8f0; color: #64748b; word-break: break-all; }
-  .result.ok      { background: #f0fdf4; border-color: #86efac; color: #166534; }
-  .result.err     { background: #fef2f2; border-color: #fca5a5; color: #991b1b; }
-  .result.sending { background: #eff6ff; border-color: #93c5fd; color: #1e40af; }
-  .result.sent    { background: #f0fdf4; border-color: #86efac; color: #166534; }
+  .result.ok   { background: #f0fdf4; border-color: #86efac; color: #166534; }
+  .result.err  { background: #fef2f2; border-color: #fca5a5; color: #991b1b; }
+  .result.send { background: #eff6ff; border-color: #93c5fd; color: #1e40af; }
+  .value-big { font-size: 22px; font-weight: 700; letter-spacing: 1px; margin: 4px 0; }
   .btn-row { display: flex; gap: 8px; margin-top: 12px; }
-  button { flex: 1; padding: 10px; border-radius: 8px; border: none; font-size: 14px; font-weight: 500; cursor: pointer; }
+  button { flex: 1; padding: 11px; border-radius: 8px; border: none; font-size: 14px; font-weight: 500; cursor: pointer; transition: background 0.15s; }
   .b-blue { background: #2563eb; color: #fff; } .b-blue:hover { background: #1d4ed8; }
   .b-red  { background: #ef4444; color: #fff; } .b-red:hover  { background: #dc2626; }
-  #send-status { margin-top: 8px; font-size: 13px; color: #64748b; min-height: 20px; text-align: center; }
-  #frames { font-size: 12px; color: #94a3b8; margin-top: 6px; text-align: center; }
+  .b-gray { background: #e2e8f0; color: #334155; } .b-gray:hover { background: #cbd5e1; }
   .tip { font-size: 12px; color: #94a3b8; margin-top: 8px; text-align: center; }
+  #send-status { margin-top: 8px; font-size: 13px; color: #64748b; text-align: center; min-height: 18px; }
+  #engine-tag { font-size: 11px; padding: 2px 8px; border-radius: 20px; margin-left: 6px;
+                background: #e0f2fe; color: #0369a1; font-weight: 500; vertical-align: middle; }
 </style>
 </head>
 <body>
 
 <h1>Barcode Scanner</h1>
-<p class="sub">Powered by ZXing · Sends to Power Apps via Power Automate</p>
-<div id="lib-status" class="s-wait">⏳ Loading ZXing library…</div>
+<p class="sub">Auto-detects best engine for your device</p>
+
+<div id="lib-banner" class="banner b-wait">⏳ Detecting best scan engine for this device…</div>
 
 <div class="card">
-  <h2>📷 Live Camera</h2>
-  <video id="video" playsinline muted></video>
-  <div class="result" id="scan-result">Press Start, then aim at your barcode.</div>
-  <div id="send-status"></div>
-  <div id="frames"></div>
-  <div class="btn-row">
-    <button class="b-blue" onclick="startCamera()">▶ Start</button>
-    <button class="b-red"  onclick="stopCamera()">■ Stop</button>
+  <div style="display:flex; align-items:center; margin-bottom:12px;">
+    <span style="font-size:14px; font-weight:600; color:#334155;">📷 Live Camera</span>
+    <span id="engine-tag">detecting…</span>
   </div>
-  <p class="tip">Scans continuously · Result auto-sends to Power Apps.</p>
+
+  <div class="video-wrap">
+    <video id="video" playsinline muted></video>
+    <div class="aim-box">
+      <span class="aim-label">Align barcode inside box</span>
+    </div>
+  </div>
+
+  <div class="result" id="scan-result">Press Start, then aim barcode at the box above.</div>
+  <div id="send-status"></div>
+
+  <div class="btn-row">
+    <button class="b-blue" onclick="startScan()">▶ Start</button>
+    <button class="b-red"  onclick="stopScan()">■ Stop</button>
+    <button class="b-gray" onclick="resetResult()">↺ Reset</button>
+  </div>
+  <p class="tip">Holds last scanned value until you reset or scan again.</p>
 </div>
 
 <script>
-  /* ─────────────────────────────────────────────
-     PASTE YOUR POWER AUTOMATE HTTP TRIGGER URL HERE
-  ───────────────────────────────────────────── */
-  var FLOW_URL = 'https://default83e7a35a0a994b62815fd0f746eb13.7b.environment.api.powerplatform.com:443/powerautomate/automations/direct/workflows/064c853e6c3b45fda769c509d652c56d/triggers/manual/paths/invoke?api-version=1';
+  /* ══════════════════════════════════════════
+     CONFIG — paste your Power Automate URL
+  ══════════════════════════════════════════ */
+  var FLOW_URL = 'PASTE_YOUR_POWER_AUTOMATE_URL_HERE';
 
-  /* ── ZXing Loader ── */
-  var zxingReady = false;
-  var lastScanned = '';        // prevent duplicate sends
-  var cameraReader = null;
-  var frameCount = 0;
+  /* ══════════════════════════════════════════
+     STATE
+  ══════════════════════════════════════════ */
+  var engine      = null;   // 'native' | 'zxing'
+  var scanning    = false;
+  var lastValue   = '';
+  var zxingReader = null;
+  var nativeDetector = null;
+  var nativeTimer    = null;
+  var stream         = null;
+
+  /* ══════════════════════════════════════════
+     ENGINE DETECTION
+     Try native BarcodeDetector first (Android Chrome/Edge)
+     Fall back to ZXing (works everywhere incl iOS)
+  ══════════════════════════════════════════ */
+  function detectEngine() {
+    if ('BarcodeDetector' in window) {
+      BarcodeDetector.getSupportedFormats().then(function(formats) {
+        if (formats.length > 0) {
+          engine = 'native';
+          setBanner('ok', '✅ Using Native BarcodeDetector (best quality, on-device, free)');
+          document.getElementById('engine-tag').textContent = '⚡ Native';
+          document.getElementById('engine-tag').style.background = '#dcfce7';
+          document.getElementById('engine-tag').style.color = '#166534';
+        } else {
+          loadZXing();
+        }
+      }).catch(loadZXing);
+    } else {
+      loadZXing();
+    }
+  }
+
+  function loadZXing() {
+    engine = 'zxing';
+    setBanner('b-info', '⚠️ Native BarcodeDetector not available — loading ZXing fallback…');
+    document.getElementById('engine-tag').textContent = '🔄 ZXing';
+
+    loadScript(
+      'https://cdn.jsdelivr.net/npm/@zxing/library@0.19.1/umd/index.min.js',
+      onZXingReady,
+      function() {
+        loadScript(
+          'https://unpkg.com/@zxing/library@0.19.1/umd/index.min.js',
+          onZXingReady,
+          function() { setBanner('err', '❌ Failed to load ZXing. Check internet and refresh.'); }
+        );
+      }
+    );
+  }
+
+  function onZXingReady() {
+    if (typeof ZXing === 'undefined' || !ZXing.BrowserMultiFormatReader) {
+      setBanner('err', '❌ ZXing loaded but not initialised. Refresh the page.');
+      return;
+    }
+    setBanner('ok', '✅ Using ZXing (cross-platform fallback — works on iOS & Android)');
+    document.getElementById('engine-tag').textContent = '🔄 ZXing';
+  }
 
   function loadScript(src, ok, fail) {
     var s = document.createElement('script');
@@ -68,125 +144,165 @@
     document.head.appendChild(s);
   }
 
-  function onZXingLoaded() {
-    if (typeof ZXing === 'undefined' || !ZXing.BrowserMultiFormatReader) {
-      setLibStatus('err', '❌ ZXing loaded but not initialised. Refresh the page.');
-      return;
-    }
-    zxingReady = true;
-    setLibStatus('ok', '✅ ZXing ready — press Start to scan.');
-  }
-
-  loadScript(
-    'https://cdn.jsdelivr.net/npm/@zxing/library@0.19.1/umd/index.min.js',
-    onZXingLoaded,
-    function () {
-      loadScript(
-        'https://unpkg.com/@zxing/library@0.19.1/umd/index.min.js',
-        onZXingLoaded,
-        function () { setLibStatus('err', '❌ Both CDNs failed — check internet and refresh.'); }
-      );
-    }
-  );
-
-  function setLibStatus(type, msg) {
-    var el = document.getElementById('lib-status');
-    el.className = 's-' + type;
+  function setBanner(cls, msg) {
+    var el = document.getElementById('lib-banner');
+    el.className = 'banner ' + cls;
     el.textContent = msg;
   }
 
-  function guard() {
-    if (!zxingReady) { alert('ZXing not ready — wait for the green banner.'); return false; }
-    return true;
+  /* ══════════════════════════════════════════
+     START / STOP
+  ══════════════════════════════════════════ */
+  function startScan() {
+    if (scanning) return;
+    if (!engine) { alert('Engine still loading — wait for the status banner to confirm.'); return; }
+
+    var r = document.getElementById('scan-result');
+    r.className = 'result';
+    r.textContent = '🔍 Scanning… align barcode inside the box.';
+    document.getElementById('send-status').textContent = '';
+    lastValue = '';
+    scanning  = true;
+
+    if (engine === 'native') {
+      startNative();
+    } else {
+      startZXing();
+    }
   }
 
-  function escHtml(s) {
-    return String(s).replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;');
-  }
-
-  /* ── Camera Scan ── */
-  function startCamera() {
-    if (!guard() || cameraReader) return;
-    var resultEl   = document.getElementById('scan-result');
-    var sendEl     = document.getElementById('send-status');
-    resultEl.className = 'result';
-    resultEl.textContent = '🔍 Scanning… aim at your barcode.';
-    sendEl.textContent   = '';
-    frameCount = 0;
-    lastScanned = '';
-
-    cameraReader = new ZXing.BrowserMultiFormatReader();
-    cameraReader.decodeFromVideoDevice(null, document.getElementById('video'), function (result, err) {
-      frameCount++;
-      document.getElementById('frames').textContent = 'Frames: ' + frameCount;
-
-      if (result) {
-        var value  = result.getText();
-        var format = String(result.getBarcodeFormat());
-
-        // Show scan result immediately
-        resultEl.className = 'result ok';
-        resultEl.innerHTML =
-          '✅ <strong>READABLE</strong><br>' +
-          '<strong>Value:</strong> '  + escHtml(value) + '<br>' +
-          '<strong>Format:</strong> ' + escHtml(format);
-
-        // Only send if different from last scan (avoid spam)
-        if (value !== lastScanned) {
-          lastScanned = value;
-          sendToFlow(value, format);
-        }
-
-      } else if (err && !(err instanceof ZXing.NotFoundException)) {
-        resultEl.className = 'result err';
-        resultEl.textContent = '❌ ' + err.message;
-      }
-    });
-  }
-
-  function stopCamera() {
-    if (cameraReader) { cameraReader.reset(); cameraReader = null; }
-    document.getElementById('frames').textContent = '';
-    lastScanned = '';
+  function stopScan() {
+    scanning = false;
+    if (nativeTimer) { clearInterval(nativeTimer); nativeTimer = null; }
+    if (stream) { stream.getTracks().forEach(function(t){ t.stop(); }); stream = null; }
+    if (zxingReader) { zxingReader.reset(); zxingReader = null; }
     var r = document.getElementById('scan-result');
     r.className = 'result';
     r.textContent = 'Camera stopped. Press Start to scan again.';
     document.getElementById('send-status').textContent = '';
   }
 
-  /* ── Send to Power Automate ── */
+  function resetResult() {
+    lastValue = '';
+    var r = document.getElementById('scan-result');
+    r.className = 'result';
+    r.textContent = 'Reset. Press Start to scan again.';
+    document.getElementById('send-status').textContent = '';
+  }
+
+  /* ══════════════════════════════════════════
+     NATIVE BarcodeDetector ENGINE
+     Runs entirely on-device, no API cost
+  ══════════════════════════════════════════ */
+  function startNative() {
+    var video = document.getElementById('video');
+
+    navigator.mediaDevices.getUserMedia({ video: { facingMode: 'environment' } })
+      .then(function(s) {
+        stream = s;
+        video.srcObject = s;
+        video.play();
+
+        nativeDetector = new BarcodeDetector({ formats: [
+          'code_128', 'code_39', 'code_93', 'codabar',
+          'ean_13', 'ean_8', 'upc_a', 'upc_e',
+          'qr_code', 'pdf417', 'aztec', 'data_matrix', 'itf'
+        ]});
+
+        // Poll every 300ms — fast enough without burning CPU
+        nativeTimer = setInterval(function() {
+          if (!scanning || video.readyState < 2) return;
+          nativeDetector.detect(video)
+            .then(function(barcodes) {
+              if (barcodes.length > 0) {
+                var b = barcodes[0];
+                onBarcodeFound(b.rawValue, b.format);
+              }
+            })
+            .catch(function() {}); // silent fail on each frame
+        }, 300);
+      })
+      .catch(function(err) {
+        var r = document.getElementById('scan-result');
+        r.className = 'result err';
+        r.textContent = '❌ Camera access denied: ' + err.message;
+        scanning = false;
+      });
+  }
+
+  /* ══════════════════════════════════════════
+     ZXING FALLBACK ENGINE (iOS + older Android)
+  ══════════════════════════════════════════ */
+  function startZXing() {
+    zxingReader = new ZXing.BrowserMultiFormatReader();
+    zxingReader.decodeFromVideoDevice(null, document.getElementById('video'), function(result, err) {
+      if (result) {
+        onBarcodeFound(result.getText(), String(result.getBarcodeFormat()));
+      } else if (err && !(err instanceof ZXing.NotFoundException)) {
+        var r = document.getElementById('scan-result');
+        r.className = 'result err';
+        r.textContent = '❌ ' + err.message;
+      }
+    });
+  }
+
+  /* ══════════════════════════════════════════
+     ON BARCODE FOUND
+  ══════════════════════════════════════════ */
+  function onBarcodeFound(value, format) {
+    var r = document.getElementById('scan-result');
+    r.className = 'result ok';
+    r.innerHTML =
+      '✅ <strong>READABLE</strong><br>' +
+      '<span class="value-big">' + escHtml(value) + '</span><br>' +
+      '<span style="font-size:12px;color:#4ade80;">Format: ' + escHtml(format) + '</span>';
+
+    // Only send if new value — prevent duplicate POSTs
+    if (value !== lastValue) {
+      lastValue = value;
+      sendToFlow(value, format);
+    }
+  }
+
+  /* ══════════════════════════════════════════
+     SEND TO POWER AUTOMATE
+  ══════════════════════════════════════════ */
   function sendToFlow(value, format) {
     var sendEl = document.getElementById('send-status');
 
     if (!FLOW_URL || FLOW_URL === 'PASTE_YOUR_POWER_AUTOMATE_URL_HERE') {
-      sendEl.textContent = '⚠️ Power Automate URL not configured.';
+      sendEl.textContent = '⚠️ Power Automate URL not set.';
       return;
     }
 
     sendEl.textContent = '📡 Sending to Power Apps…';
 
-    var payload = {
-      barcodeValue:  value,
-      barcodeFormat: format,
-      scannedAt:     new Date().toISOString()
-    };
-
     fetch(FLOW_URL, {
       method:  'POST',
       headers: { 'Content-Type': 'application/json' },
-      body:    JSON.stringify(payload)
+      body: JSON.stringify({
+        barcodeValue:  value,
+        barcodeFormat: format,
+        isReadable:    true,
+        scannedAt:     new Date().toISOString()
+      })
     })
-    .then(function (res) {
-      if (res.ok) {
-        sendEl.textContent = '✅ Sent to Power Apps successfully!';
-      } else {
-        sendEl.textContent = '⚠️ Flow responded with status ' + res.status;
-      }
+    .then(function(res) {
+      sendEl.textContent = res.ok
+        ? '✅ Sent to Power Apps!'
+        : '⚠️ Flow returned status ' + res.status;
     })
-    .catch(function (err) {
-      sendEl.textContent = '❌ Failed to send: ' + err.message;
+    .catch(function(err) {
+      sendEl.textContent = '❌ Send failed: ' + err.message;
     });
   }
+
+  function escHtml(s) {
+    return String(s).replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;');
+  }
+
+  /* ── Start engine detection on load ── */
+  detectEngine();
 </script>
 
 </body>
